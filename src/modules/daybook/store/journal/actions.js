@@ -13,3 +13,7 @@ export const updateEntry = async(/* { commit } */) => {
 export const createEntry = async(/* { commit } */) => {
 
 }
+
+export const deleteEntry = async(/* { commit } */) => {
+
+}
