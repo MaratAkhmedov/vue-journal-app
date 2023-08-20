@@ -5,14 +5,23 @@
                 <EntryDate :dateString="entry.date" />
             </div>
             <div>
-                <button class="btn btn-danger mx-2">
+                <button v-if="id !== 'new'"
+                        class="btn btn-danger mx-2"
+                        @click="onDeleteEntry">
                     Borrar
                     <i class="fa fa-trash-alt"></i>
                 </button>
-                <button class="btn btn-primary">
+
+                <button class="btn btn-primary"
+                        @click="onSelectImage">
                     Subir foto
                     <i class="fa fa-upload"></i>
                 </button>
+                <input type="file"
+                       @change="onSelectedImage"
+                       ref="imageSelector"
+                       v-show="false"
+                       accept="image/png, image/jpeg, image/jpg">
             </div>
         </div>
         <hr>
@@ -23,15 +32,23 @@
         </div>
     </template>
 
-    <Fab icon="fa-save" />
+    <Fab icon="fa-save"
+         @on:click="saveEntry" />
 
-    <img src="https://images.unsplash.com/photo-1575936123452-b67c3203c357?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80"
+    <!-- <img v-if="entry.picture && !localImage"
+         :src="entry.picture"
+         alt="entry-picture"
+         class="img-thumbnail"> -->
+    <img v-if="localImage || entry.picture"
+         :src="localImage || entry.picture"
          alt="entry-picture"
          class="img-thumbnail">
 </template>
 <script>
 import { defineAsyncComponent } from 'vue';
-import { mapGetters } from 'vuex'
+import { mapGetters, mapActions } from 'vuex'
+import Swal from 'sweetalert2'
+import uploadImage from '@/helpers/uploadImage'
 
 export default {
     props: {
@@ -42,7 +59,9 @@ export default {
     },
     data() {
         return {
-            data: null
+            entry: null,
+            localImage: null,
+            file: null
         }
     },
     components: {
@@ -51,25 +70,88 @@ export default {
     },
     methods: {
         loadEntry() {
-            const entry = this.getEntryById(this.id)
+            this.localImage = null;     // empty previously created image
+            this.file = null;     // empty previously created image
 
-            if (!entry) {
-                return this.$router.push({ name: 'daybook-no-entry' })
+            let entry;
+            if (this.id === 'new') {
+                entry = {
+                    text: '',
+                    date: new Date().toDateString()
+                }
+            } else {
+                entry = this.getEntryById(this.id)                
+                if (!entry) return this.$router.push({ name: 'daybook-no-entry' })
             }
+
             this.entry = entry
 
-        }
+        },
+        async saveEntry() {
+
+            new Swal({
+                title: 'Espere por favor',
+                allowOutsideClick: false,
+            })
+            Swal.showLoading()
+
+            if(this.localImage) {
+                const picture = await uploadImage(this.file)
+                this.entry.picture = picture
+            }
+
+            if (this.entry.id) {
+                console.log('this.entry', this.entry);
+                
+                await this.updateEntry(this.entry)
+            } else {
+                const id = await this.createEntry(this.entry)
+                this.$router.push({ name: 'daybook-entry', params: { id } })
+            }
+            //this.file = null
+            Swal.fire('Guardado', 'Entrada registrada con éxito', 'success')
+        },
+        async onDeleteEntry() {
+
+            const { isConfirmed } = await Swal.fire({
+                title: '¿Está seguro?',
+                text: 'Una vez borrado, no se puede recuperar',
+                showDenyButton: true,
+                confirmButtonText: 'Si, estoy seguro'
+            })
+            if (!isConfirmed) return
+
+            this.deleteEntry(this.entry.id)
+            this.$router.push({ name: 'daybook-no-entry' })
+        },
+        onSelectedImage(event) {
+            const file = event.target.files[0]
+
+            if (!file) {
+                this.localImage = null
+                this.file = file
+                return
+            }
+
+            this.file = file
+
+            const fr = new FileReader()
+            fr.onload = () => this.localImage = fr.result
+            fr.readAsDataURL(file)
+        },
+        onSelectImage() {
+            this.$refs.imageSelector.click()
+        },
+        ...mapActions('journal', ['updateEntry', 'createEntry', 'deleteEntry'])
     },
     computed: {
         ...mapGetters('journal', ['getEntryById'])
     },
-    created() {
+    created() {        
         this.loadEntry();
-
-        //console.log(this.id);
     },
     watch: {
-        id() {
+        id() {            
             this.loadEntry();
         }
     }
