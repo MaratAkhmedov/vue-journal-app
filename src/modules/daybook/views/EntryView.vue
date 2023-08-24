@@ -35,12 +35,8 @@
     <Fab icon="fa-save"
          @on:click="saveEntry" />
 
-    <!-- <img v-if="entry.picture && !localImage"
-         :src="entry.picture"
-         alt="entry-picture"
-         class="img-thumbnail"> -->
-    <img v-if="localImage || entry.picture"
-         :src="localImage || entry.picture"
+    <img v-if="localImage || (entry && entry.picture)"
+         :src="localImage || (entry && entry.picture)"
          alt="entry-picture"
          class="img-thumbnail">
 </template>
@@ -51,6 +47,7 @@ import Swal from 'sweetalert2'
 import uploadImage from '@/helpers/uploadImage'
 
 export default {
+    name: 'EntryView',
     props: {
         id: {
             type: String,
@@ -89,7 +86,7 @@ export default {
         },
         async saveEntry() {
 
-            new Swal({
+            Swal.fire({
                 title: 'Espere por favor',
                 allowOutsideClick: false,
             })
@@ -100,9 +97,7 @@ export default {
                 this.entry.picture = picture
             }
 
-            if (this.entry.id) {
-                console.log('this.entry', this.entry);
-                
+            if (this.entry.id) {                
                 await this.updateEntry(this.entry)
             } else {
                 const id = await this.createEntry(this.entry)
@@ -111,18 +106,25 @@ export default {
             //this.file = null
             Swal.fire('Guardado', 'Entrada registrada con éxito', 'success')
         },
-        async onDeleteEntry() {
-
+        async onDeleteEntry() {            
             const { isConfirmed } = await Swal.fire({
                 title: '¿Está seguro?',
                 text: 'Una vez borrado, no se puede recuperar',
                 showDenyButton: true,
                 confirmButtonText: 'Si, estoy seguro'
             })
+
             if (!isConfirmed) return
 
-            this.deleteEntry(this.entry.id)
+            Swal.fire({
+                title: 'Espere por favor',
+                allowOutsideClick: false
+            })
+            Swal.showLoading()
+            
+            await this.deleteEntry(this.entry.id)
             this.$router.push({ name: 'daybook-no-entry' })
+            Swal.fire('Eliminado', '', 'success')
         },
         onSelectedImage(event) {
             const file = event.target.files[0]
